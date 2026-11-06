@@ -69,14 +69,13 @@ class SimpleAuditor(ast.NodeVisitor):
                 self.violations.append(f"Forbidden method call '{module_name}.{method_name}' on line {node.lineno}")
         self.generic_visit(node)
 
-    def inspect(self, node):
-        '''
-        If violations is 0, Low risk
-        If violations are low risk (print) methods, medium risk with warning but auto approve
-        if violations are functions or violations more than 10, high risk and triggers
-        :param node:
-        :return:
-        '''
+    def visit_ImportFrom(self, node):
+        if node.module in BLOCKED_MODULES:
+            self.violations.append(f"Forbidden import from module '{node.module}' at line {node.lineno}")
+        for alias in node.names:
+            if alias.name in BLOCKED_MODULES:
+                self.violations.append(f"Forbidden import of '{alias.name}' at line {node.lineno}")
+        self.generic_visit(node)
 
 @app.post("/api/audit")
 async def audit_code_endpoint(payload: CodePayload):
@@ -129,8 +128,12 @@ async def websocket_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(ws)
 
+def start():
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
-
+if __name__ == "__main__":
+    start()
 
 
 
