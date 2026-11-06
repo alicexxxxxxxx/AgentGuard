@@ -3,11 +3,22 @@ import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict
+import sys
+import builtins
 
 app = FastAPI()
 
-BLOCKED_MODULES = {"os", "subprocess", "sh", "pty", "commands"}
-BLOCKED_CALLS = {"eval", "print", "exec"}
+DANGEROUS_PREFIXES = ("os", "sys", "subprocess", "socket", "http", "urllib", "asyncio", "multiprocessing")
+
+BLOCKED_MODULES = {
+    mod for mod in sys.stdlib_module_names
+    if any(mod.startswith(prefix) for prefix in DANGEROUS_PREFIXES)
+} | {"shutil", "importlib", "ctypes", "pathlib", "tempfile", "pty", "commands"}
+
+BLOCKED_CALLS = {
+    name for name in dir(builtins)
+    if name in {"eval", "exec", "compile", "open", "__import__", "globals", "locals", "vars", "breakpoint"}
+}
 
 class ConnectionManager:
     def __init__(self):
@@ -49,6 +60,23 @@ class SimpleAuditor(ast.NodeVisitor):
         if isinstance(node.func, ast.Name) and node.func.id in BLOCKED_CALLS:
             self.violations.append(f"Forbidden call '{node.func.id}()' at line {node.lineno}")
         self.generic_visit(node)
+
+    def visit_Attribute(self, node):
+        if isinstance(node.value, ast.Name):
+            module_name = node.value.id
+            method_name = node.attr
+            if module_name in BLOCKED_MODULES:
+                self.violations.append(f"Forbidden method call '{module_name}.{method_name}' on line {node.lineno}")
+        self.generic_visit(node)
+
+    def inspect(self, node):
+        '''
+        If violations is 0, Low risk
+        If violations are low risk (print) methods, medium risk with warning but auto approve
+        if violations are functions or violations more than 10, high risk and triggers
+        :param node:
+        :return:
+        '''
 
 @app.post("/api/audit")
 async def audit_code_endpoint(payload: CodePayload):
