@@ -8,7 +8,7 @@ version = "0.1.0"
 authors = [
   { name="Alicexxxxxxxx", email="endyli3008@gmail.com" },
 ]
-description = "A short description of AgentGuard"
+description = "AgentGuard AST Security & Real-Time Authorization Gateway"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
@@ -17,11 +17,16 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    # Add third-party packages here, e.g. "requests>=2.28.0"
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "pydantic>=2.0.0"
 ]
 
 [project.urls]
 "Homepage" = "https://github.com/alicexxxxxxxx/AgentGuard"
+
+[project.scripts]
+agentguard = "agentguard.main:start"
 
 [tool.setuptools.packages.find]
 where = ["src"]
